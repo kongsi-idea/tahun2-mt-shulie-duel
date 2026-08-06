@@ -18,6 +18,11 @@
     <!-- 引入字体 -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
 
+    <!-- kelasku：如果网址带 ?code=，自动读班级学生名单给玩家选自己的名字；没有 code 时下面的逻辑会自动 fallback 成手动输入 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://kongsi-idea.vercel.app/data/supabase-client.js"></script>
+    <script src="https://kongsi-idea.vercel.app/data/class-code-client.js"></script>
+
     <style>
         html, body, #root { height: 100%; margin: 0; }
         body { font-family: 'Noto Sans SC', sans-serif; touch-action: manipulation; }
@@ -106,7 +111,7 @@
 
         // --- 子组件 ---
 
-        const PlayerCard = ({ id, hp, maxHp, color, isFrozen, combo, characterType, lastAction }) => {
+        const PlayerCard = ({ id, name, hp, maxHp, color, isFrozen, combo, characterType, lastAction }) => {
             const isLeft = id === 1;
             const barColor = isLeft ? 'bg-blue-500' : 'bg-red-500';
             const textColor = isLeft ? 'text-blue-400' : 'text-red-400';
@@ -152,7 +157,7 @@
                         )}
                     </div>
 
-                    <h2 className={`text-2xl font-black ${textColor} mb-2`}>PLAYER {id}</h2>
+                    <h2 className={`text-2xl font-black ${textColor} mb-2`}>{name || `PLAYER ${id}`}</h2>
 
                     {/* 血条 */}
                     <div className="w-full h-8 bg-slate-900 rounded-full border-2 border-slate-600 overflow-hidden relative shadow-inner">
@@ -192,7 +197,17 @@
             const [gameState, setGameState] = useState('menu'); // menu, playing, end
             const [level, setLevel] = useState(1);
             const [problem, setProblem] = useState(null);
-            
+
+            // kelasku 学生名单（?code= 有效时会有内容，否则是空阵列，两个名字输入框自动退回手动打字）
+            const [roster, setRoster] = useState([]);
+            const [p1Name, setP1Name] = useState('');
+            const [p2Name, setP2Name] = useState('');
+
+            useEffect(() => {
+                if (typeof ClassCode === 'undefined') return;
+                ClassCode.load().then((list) => setRoster(list.map((s) => s.name)));
+            }, []);
+
             // 玩家状态
             const [p1, setP1] = useState({ hp: 100, maxHp: 100, frozen: false, combo: 0, lastAction: null });
             const [p2, setP2] = useState({ hp: 100, maxHp: 100, frozen: false, combo: 0, lastAction: null });
@@ -295,7 +310,38 @@
                             <h1 className="text-5xl md:text-7xl font-black mb-2">双人数字对决</h1>
                             <p className="text-xl text-slate-300">同屏竞技 • 谁算得更快？</p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-2xl mt-12">
+                            <div className="flex gap-4 w-full max-w-xl mx-auto mt-8">
+                                <div className="flex-1 text-left">
+                                    <label className="text-xs font-bold text-blue-400 mb-1 block">玩家 1 名字</label>
+                                    <input
+                                        type="text"
+                                        list="p1-roster"
+                                        value={p1Name}
+                                        onChange={(e) => setP1Name(e.target.value)}
+                                        placeholder="玩家 1"
+                                        className="w-full px-3 py-2 rounded-lg bg-slate-800 border-2 border-blue-500 text-white placeholder-slate-500"
+                                    />
+                                    <datalist id="p1-roster">
+                                        {roster.map((n) => <option key={n} value={n} />)}
+                                    </datalist>
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <label className="text-xs font-bold text-red-400 mb-1 block">玩家 2 名字</label>
+                                    <input
+                                        type="text"
+                                        list="p2-roster"
+                                        value={p2Name}
+                                        onChange={(e) => setP2Name(e.target.value)}
+                                        placeholder="玩家 2"
+                                        className="w-full px-3 py-2 rounded-lg bg-slate-800 border-2 border-red-500 text-white placeholder-slate-500"
+                                    />
+                                    <datalist id="p2-roster">
+                                        {roster.map((n) => <option key={n} value={n} />)}
+                                    </datalist>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-2xl mt-4">
                                 {[1, 2, 3].map(lvl => (
                                     <button
                                         key={lvl}
@@ -336,7 +382,7 @@
                     <div className="h-full flex flex-col items-center justify-center bg-slate-900 z-50 relative">
                         <div className={`absolute inset-0 opacity-20 ${winner === 1 ? 'bg-blue-600' : 'bg-red-600'}`}></div>
                         <h1 className={`text-6xl md:text-8xl font-black mb-8 ${winner === 1 ? 'text-blue-400' : 'text-red-400'} animate-bounce`}>
-                            玩家 {winner} 获胜!
+                            {(winner === 1 ? p1Name : p2Name) || `玩家 ${winner}`} 获胜!
                         </h1>
                         <button 
                             onClick={() => setGameState('menu')}
@@ -381,7 +427,7 @@
                     {/* 玩家 1 区域 (左/上) */}
                     <div className="flex-1 relative border-b-2 md:border-b-0 md:border-r-2 border-slate-800 flex flex-col justify-end pb-8 md:pb-12 bg-gradient-to-b from-slate-900 to-blue-900/20">
                         <div className="flex-1 flex flex-col items-center justify-center pt-20">
-                            <PlayerCard id={1} {...p1} />
+                            <PlayerCard id={1} name={p1Name} {...p1} />
                         </div>
                         <div className="px-4 md:px-12 grid grid-cols-3 gap-3 md:gap-6 w-full max-w-xl mx-auto z-20">
                             {options.map((opt, i) => (
@@ -400,7 +446,7 @@
                     {/* 玩家 2 区域 (右/下) */}
                     <div className="flex-1 relative flex flex-col justify-end pb-8 md:pb-12 bg-gradient-to-b from-slate-900 to-red-900/20">
                         <div className="flex-1 flex flex-col items-center justify-center pt-20">
-                            <PlayerCard id={2} {...p2} />
+                            <PlayerCard id={2} name={p2Name} {...p2} />
                         </div>
                         <div className="px-4 md:px-12 grid grid-cols-3 gap-3 md:gap-6 w-full max-w-xl mx-auto z-20">
                             {options.map((opt, i) => (

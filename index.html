@@ -205,7 +205,7 @@
 
             useEffect(() => {
                 if (typeof ClassCode === 'undefined') return;
-                ClassCode.load().then((list) => setRoster(list.map((s) => s.name)));
+                ClassCode.loadOrPrompt().then((list) => setRoster(list.map((s) => s.name)));
             }, []);
 
             // 玩家状态
